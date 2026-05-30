@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>NeuroScan — Brain Tumor Classifier</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">
+
+<style>
+/* ── Reset & Base ───────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #060810;
+  --surface:   #0d1117;
+  --surface2:  #131922;
+  --border:    #1e2a3a;
+  --accent:    #00e5ff;
+  --accent2:   #7b61ff;
+  --danger:    #ff4d6d;
+  --success:   #00d68f;
+  --text:      #e8edf5;
+  --muted:     #5a6a82;
+  --glow:      0 0 40px rgba(0,229,255,.15);
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Mono', monospace;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── Animated background grid ───────────────────────────────── */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(0,229,255,.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,229,255,.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── Header ─────────────────────────────────────────────────── */
+header {
+  position: relative; z-index: 10;
+  padding: 2.5rem 3rem 2rem;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+
+.logo {
+  font-family: 'Syne', sans-serif;
+  font-weight: 800; font-size: 1.6rem;
+  letter-spacing: -.02em;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+
+.logo span { font-weight: 400; color: var(--muted); -webkit-text-fill-color: var(--muted); }
+
+.badge {
+  font-size: .68rem; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--accent); border: 1px solid rgba(0,229,255,.3);
+  padding: .35em .9em; border-radius: 2px;
+}
+
+/* ── Main layout ─────────────────────────────────────────────── */
+main {
+  position: relative; z-index: 5;
+  max-width: 1100px; margin: 0 auto;
+  padding: 3rem 2rem 6rem;
+}
+
+.hero {
+  text-align: center; margin-bottom: 4rem;
+}
+
+.hero h1 {
+  font-family: 'Syne', sans-serif; font-size: clamp(2rem, 5vw, 3.4rem);
+  font-weight: 800; line-height: 1.1; letter-spacing: -.03em;
+  margin-bottom: 1rem;
+}
+
+.hero h1 em {
+  font-style: normal;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+
+.hero p { color: var(--muted); font-size: .9rem; line-height: 1.7; max-width: 520px; margin: 0 auto; }
+
+/* ── Card ────────────────────────────────────────────────────── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 2.2rem;
+  margin-bottom: 1.5rem;
+  transition: border-color .3s;
+}
+
+.card:hover { border-color: rgba(0,229,255,.25); }
+
+.card-label {
+  font-size: .65rem; letter-spacing: .15em; text-transform: uppercase;
+  color: var(--accent); margin-bottom: 1.2rem; display: flex; align-items: center; gap: .6rem;
+}
+
+.card-label::after {
+  content: ''; flex: 1; height: 1px; background: var(--border);
+}
+
+/* ── Model selector ──────────────────────────────────────────── */
+.model-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem;
+}
+
+.model-option {
+  position: relative; cursor: pointer;
+}
+
+.model-option input[type="radio"] {
+  position: absolute; opacity: 0; width: 0; height: 0;
+}
+
+.model-tile {
+  border: 1.5px solid var(--border);
+  border-radius: 6px; padding: 1.3rem 1.4rem;
+  transition: border-color .25s, background .25s, transform .2s;
+  background: var(--surface2);
+  display: flex; flex-direction: column; gap: .5rem;
+}
+
+.model-option input:checked ~ .model-tile {
+  border-color: var(--accent);
+  background: rgba(0,229,255,.05);
+  box-shadow: var(--glow);
+}
+
+.model-option:hover .model-tile {
+  transform: translateY(-2px);
+  border-color: rgba(0,229,255,.4);
+}
+
+.model-tile .m-name {
+  font-family: 'Syne', sans-serif; font-weight: 700; font-size: .95rem;
+}
+
+.model-tile .m-desc { font-size: .75rem; color: var(--muted); line-height: 1.5; }
+
+.model-tile .m-tag {
+  font-size: .62rem; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--accent2); margin-top: .3rem;
+}
+
+.model-option input:checked ~ .model-tile .m-tag { color: var(--accent); }
+
+/* Radio dot */
+.model-tile::before {
+  content: '';
+  width: 8px; height: 8px; border-radius: 50%;
+  border: 1.5px solid var(--muted);
+  display: inline-block; margin-bottom: .6rem;
+  transition: background .2s, border-color .2s;
+}
+
+.model-option input:checked ~ .model-tile::before {
+  background: var(--accent); border-color: var(--accent);
+  box-shadow: 0 0 10px var(--accent);
+}
+
+/* ── Drop zone ───────────────────────────────────────────────── */
+#drop-zone {
+  border: 2px dashed var(--border);
+  border-radius: 8px;
+  padding: 3rem 2rem;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .3s, background .3s;
+  background: var(--surface2);
+  position: relative;
+  overflow: hidden;
+}
+
+#drop-zone.drag-over {
+  border-color: var(--accent);
+  background: rgba(0,229,255,.06);
+}
+
+#drop-zone.has-file {
+  border-color: var(--success);
+  background: rgba(0,214,143,.05);
+}
+
+.dz-icon {
+  font-size: 2.5rem; margin-bottom: 1rem;
+  filter: grayscale(1) opacity(.5);
+  transition: filter .3s;
+}
+
+#drop-zone.has-file .dz-icon { filter: none; }
+
+#drop-zone p { color: var(--muted); font-size: .82rem; line-height: 1.7; }
+#drop-zone strong { color: var(--text); }
+
+#preview-wrap {
+  display: none; margin-top: 1.5rem;
+  position: relative; display: none;
+}
+
+#preview-wrap.visible { display: block; }
+
+#preview-img {
+  max-height: 220px; border-radius: 6px;
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 32px rgba(0,0,0,.5);
+}
+
+#file-name {
+  margin-top: .7rem; font-size: .72rem; color: var(--muted);
+}
+
+#clear-btn {
+  background: none; border: 1px solid var(--border);
+  color: var(--muted); font-family: 'DM Mono', monospace;
+  font-size: .72rem; padding: .4em 1em; border-radius: 4px;
+  cursor: pointer; margin-top: .6rem;
+  transition: border-color .2s, color .2s;
+}
+
+#clear-btn:hover { border-color: var(--danger); color: var(--danger); }
+
+/* ── Submit button ───────────────────────────────────────────── */
+#submit-btn {
+  width: 100%; padding: 1.1rem;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+  border: none; border-radius: 6px;
+  font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1rem;
+  color: #060810; cursor: pointer; letter-spacing: .05em;
+  transition: opacity .2s, transform .2s;
+  position: relative; overflow: hidden;
+}
+
+#submit-btn:hover:not(:disabled) { opacity: .9; transform: translateY(-1px); }
+#submit-btn:active { transform: translateY(0); }
+#submit-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+#submit-btn .btn-loader {
+  display: none; width: 18px; height: 18px;
+  border: 2px solid rgba(0,0,0,.3); border-top-color: #000;
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  margin: 0 auto;
+}
+
+#submit-btn.loading span { display: none; }
+#submit-btn.loading .btn-loader { display: block; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Results ─────────────────────────────────────────────────── */
+#result-card {
+  display: none;
+  animation: slideUp .5s ease;
+}
+
+#result-card.visible { display: block; }
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.result-top {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 1.5rem; flex-wrap: wrap; margin-bottom: 2rem;
+}
+
+.result-prediction {
+  flex: 1;
+}
+
+.result-label {
+  font-size: .65rem; letter-spacing: .15em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: .5rem;
+}
+
+.result-name {
+  font-family: 'Syne', sans-serif; font-size: 2.2rem; font-weight: 800;
+  line-height: 1; letter-spacing: -.02em;
+}
+
+.result-name.tumor   { color: var(--danger); }
+.result-name.no-tumor { color: var(--success); }
+
+.result-conf {
+  margin-top: .5rem; font-size: .82rem; color: var(--muted);
+}
+
+.result-conf strong { color: var(--text); font-size: 1.1rem; }
+
+.result-model-tag {
+  font-size: .68rem; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--accent2); border: 1px solid rgba(123,97,255,.3);
+  padding: .4em .9em; border-radius: 3px; white-space: nowrap;
+  align-self: flex-start;
+}
+
+/* ── Score bars ──────────────────────────────────────────────── */
+.score-bars { display: flex; flex-direction: column; gap: .9rem; }
+
+.score-row { }
+
+.score-header {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: .35rem;
+  font-size: .78rem;
+}
+
+.score-cls { color: var(--text); }
+.score-pct { color: var(--muted); font-size: .72rem; }
+
+.score-track {
+  height: 6px; background: var(--border); border-radius: 3px; overflow: hidden;
+}
+
+.score-fill {
+  height: 100%; border-radius: 3px;
+  background: linear-gradient(90deg, var(--accent2), var(--accent));
+  width: 0%; transition: width 1s cubic-bezier(.4,0,.2,1);
+}
+
+.score-row.top .score-fill {
+  background: linear-gradient(90deg, var(--accent), #00ff9d);
+}
+
+.score-row.top .score-cls { font-weight: 600; }
+
+/* ── Error ───────────────────────────────────────────────────── */
+#error-box {
+  display: none; padding: 1rem 1.4rem;
+  background: rgba(255,77,109,.08); border: 1px solid rgba(255,77,109,.3);
+  border-radius: 6px; color: var(--danger); font-size: .82rem;
+  margin-bottom: 1.5rem;
+}
+
+#error-box.visible { display: block; }
+
+/* ── Footer ──────────────────────────────────────────────────── */
+footer {
+  position: relative; z-index: 5;
+  text-align: center; padding: 2rem;
+  border-top: 1px solid var(--border);
+  color: var(--muted); font-size: .72rem; letter-spacing: .05em;
+}
+
+/* ── Hidden file input ───────────────────────────────────────── */
+#file-input { display: none; }
+    .m-acc {
+  font-size: 0.7rem;
+  color: var(--success);
+  margin-top: 0.2rem;
+  font-weight: 500;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <div class="logo">Neuro<span>Scan</span></div>
+  <div class="badge">AI Diagnostic Tool</div>
+</header>
+
+<main>
+  <div class="hero">
+    <h1>Brain Tumor<br><em>Classification</em></h1>
+    <p>Upload an MRI scan and select a model to receive an instant AI-powered classification across four tumor categories.</p>
+  </div>
+
+  <!-- ① Model select ──────────────────────────── -->
+  <div class="card">
+    <div class="card-label">01 — Select Model</div>
+    <div class="model-grid" id="model-grid">
+      {% for key, info in models.items() %}
+      <label class="model-option">
+        <input type="radio" name="model_key" value="{{ key }}" {% if loop.first %}checked{% endif %}>
+        <div class="model-tile">
+          <div class="m-name">{{ info.label }}</div>
+          <div class="m-desc">{{ info.desc }}</div>
+              {% if info.accuracy %}
+            <div class="m-acc">Accuracy: {{ info.accuracy }}%</div>
+         {% endif %}
+          <div class="m-tag">{{ key }}</div>
+        </div>
+      </label>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- ② Image upload ──────────────────────────── -->
+  <div class="card">
+    <div class="card-label">02 — Upload MRI Scan</div>
+
+    <div id="drop-zone">
+      <div class="dz-icon">🧠</div>
+      <p><strong>Drop your MRI image here</strong><br>or click to browse — JPG, PNG, WEBP up to 16 MB</p>
+      <div id="preview-wrap">
+        <img id="preview-img" alt="Preview"/>
+        <div id="file-name"></div>
+        <button id="clear-btn" type="button">✕ Remove</button>
+      </div>
+    </div>
+    <input id="file-input" type="file" accept="image/*">
+  </div>
+
+  <!-- ③ Error / Submit ────────────────────────── -->
+  <div id="error-box"></div>
+
+  <button id="submit-btn" type="button">
+    <span>Analyse Scan</span>
+    <div class="btn-loader"></div>
+  </button>
+
+  <!-- ④ Results ───────────────────────────────── -->
+  <div id="result-card" class="card" style="margin-top:1.5rem;">
+    <div class="card-label">03 — Diagnosis Result</div>
+
+    <div class="result-top">
+      <div class="result-prediction">
+        <div class="result-label">Predicted Class</div>
+        <div class="result-name" id="result-name">—</div>
+        <div class="result-conf">Confidence: <strong id="result-conf">—</strong></div>
+      </div>
+      <div class="result-model-tag" id="result-model-tag">—</div>
+    </div>
+
+    <div class="card-label">Score Distribution</div>
+    <div class="score-bars" id="score-bars">
+      {% for cls in classes %}
+      <div class="score-row" data-class="{{ cls }}">
+        <div class="score-header">
+          <span class="score-cls">{{ cls }}</span>
+          <span class="score-pct" id="pct-{{ loop.index0 }}">0%</span>
+        </div>
+        <div class="score-track"><div class="score-fill" id="fill-{{ loop.index0 }}"></div></div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</main>
+
+<footer>NeuroScan · For research & educational use only · Not a medical device</footer>
+
+<script>
+const dropZone   = document.getElementById('drop-zone');
+const fileInput  = document.getElementById('file-input');
+const previewWrap= document.getElementById('preview-wrap');
+const previewImg = document.getElementById('preview-img');
+const fileNameEl = document.getElementById('file-name');
+const clearBtn   = document.getElementById('clear-btn');
+const submitBtn  = document.getElementById('submit-btn');
+const errorBox   = document.getElementById('error-box');
+const resultCard = document.getElementById('result-card');
+
+const classes = {{ classes | tojson }};
+let selectedFile = null;
+
+// ── Drag & drop ──────────────────────────────────────────────
+dropZone.addEventListener('click', e => {
+  if (e.target === clearBtn || clearBtn.contains(e.target)) return;
+  fileInput.click();
+});
+
+dropZone.addEventListener('dragover', e => {
+  e.preventDefault();
+  dropZone.classList.add('drag-over');
+});
+
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if (f && f.type.startsWith('image/')) setFile(f);
+});
+
+fileInput.addEventListener('change', () => {
+  if (fileInput.files[0]) setFile(fileInput.files[0]);
+});
+
+clearBtn.addEventListener('click', e => {
+  e.stopPropagation();
+  clearFile();
+});
+
+function setFile(f) {
+  selectedFile = f;
+  const url = URL.createObjectURL(f);
+  previewImg.src = url;
+  fileNameEl.textContent = f.name + ' — ' + (f.size / 1024).toFixed(1) + ' KB';
+  previewWrap.classList.add('visible');
+  dropZone.classList.add('has-file');
+}
+
+function clearFile() {
+  selectedFile = null;
+  fileInput.value = '';
+  previewImg.src = '';
+  previewWrap.classList.remove('visible');
+  dropZone.classList.remove('has-file');
+}
+
+// ── Submit ───────────────────────────────────────────────────
+submitBtn.addEventListener('click', async () => {
+  hideError();
+
+  if (!selectedFile) { showError('Please upload an MRI image first.'); return; }
+
+  const modelKey = document.querySelector('input[name="model_key"]:checked')?.value;
+  if (!modelKey) { showError('Please select a model.'); return; }
+
+  const formData = new FormData();
+  formData.append('image', selectedFile);
+  formData.append('model_key', modelKey);
+
+  submitBtn.classList.add('loading');
+  submitBtn.disabled = true;
+  resultCard.classList.remove('visible');
+
+  try {
+    const res  = await fetch('/predict', { method: 'POST', body: formData });
+    const data = await res.json();
+
+    if (!res.ok || data.error) {
+      showError(data.error || 'An unexpected error occurred.');
+      return;
+    }
+
+    renderResult(data);
+  } catch (err) {
+    showError('Network error. Is the Flask server running?');
+  } finally {
+    submitBtn.classList.remove('loading');
+    submitBtn.disabled = false;
+  }
+});
+
+// ── Render results ───────────────────────────────────────────
+function renderResult(data) {
+  const nameEl = document.getElementById('result-name');
+  nameEl.textContent = data.prediction;
+  nameEl.className = 'result-name ' + (data.prediction === 'No Tumor' ? 'no-tumor' : 'tumor');
+
+  document.getElementById('result-conf').textContent = data.confidence + '%';
+  document.getElementById('result-model-tag').textContent = data.model_used;
+
+  // Reset bars first
+  classes.forEach((_, i) => {
+    document.getElementById(`fill-${i}`).style.width = '0%';
+  });
+
+  resultCard.classList.add('visible');
+
+  // Animate bars with slight delay for each
+  setTimeout(() => {
+    classes.forEach((cls, i) => {
+      const pct = data.all_scores[cls] ?? 0;
+      document.getElementById(`pct-${i}`).textContent = pct.toFixed(1) + '%';
+      document.getElementById(`fill-${i}`).style.width  = pct + '%';
+
+      const row = document.querySelector(`.score-row[data-class="${cls}"]`);
+      row.classList.toggle('top', cls === data.prediction);
+    });
+  }, 80);
+
+  resultCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function showError(msg) {
+  errorBox.textContent = '⚠ ' + msg;
+  errorBox.classList.add('visible');
+}
+
+function hideError() {
+  errorBox.classList.remove('visible');
+}
+</script>
+</body>
+</html>
